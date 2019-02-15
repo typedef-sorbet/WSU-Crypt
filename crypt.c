@@ -118,7 +118,7 @@ FData f(Word r0, Word r1, int round, bool isDecryption)
 	int additives[] = {0, 1, 2, 3};
 	for(int i = 0; i < 12; i++)
 	{
-		subkeys[i] = k(4*round + additives[i%4]);
+		subkeys[i] = k(4*round + additives[i%4], isDecryption);
 	}
 
 	if(isDecryption)
@@ -135,7 +135,7 @@ FData f(Word r0, Word r1, int round, bool isDecryption)
 	Word t0 = g(r0, round, subkeys);
 	Word t1 = g(r1, round, &subkeys[4]);
 
-	struct FData data;
+	FData data;
 	Word concat1 = (Word)((Word)subkeys[8] << 8 | (Word)subkeys[9]);
 	Word concat2 = (Word)((Word)subkeys[10] << 8 | (Word)subkeys[11]);
 
@@ -152,7 +152,7 @@ Word g(Word w, int round, Byte *keysToUse)
 	Byte g4 = ftable[g3 ^ keysToUse[1]] ^ g2;
 	Byte g5 = ftable[g4 ^ keysToUse[2]] ^ g3;
 	Byte g6 = ftable[g5 ^ keysToUse[3]] ^ g4;
-	return (Word)((Word)g5 << 8 | (Word)g4);
+	return (Word)((Word)g5 << 8 | (Word)g6);
 }
 
 unsigned char k(int x, bool isDecryption)
