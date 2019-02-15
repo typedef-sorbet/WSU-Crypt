@@ -9,10 +9,15 @@
 
 void encrypt();
 void decrypt();
+void grabKey();
 
 void f();
 void g();
-void k();
+unsigned char k();
+
+typedef unsigned long long int Key;
+
+Key key;
 
 int main(int argc, char **argv)
 {
@@ -20,12 +25,20 @@ int main(int argc, char **argv)
 	// Key file: key.txt (16 chars of HEX)
 	// Output file: out.txt (entirely HEX, indefinite size)
 
+	printf("Size of unsigned long long int: %ld\n", sizeof(unsigned long long int));
+
 	if(argc == 2)
 	{
 		if(strcmp(argv[1], "encrypt") == 0)
-			encrypt();
+		{
+			grabKey();
+			encrypt();			
+		}
 		else if(strcmp(argv[1], "decrypt") == 0)
+		{
+			grabKey();
 			decrypt();
+		}
 		else
 			fprintf(stderr, "Error: invalid arguments to crypt\nUsage:\n\t$ crypt <encrypt/decrypt>\n");
 	}
@@ -69,4 +82,37 @@ void encrypt()
 void decrypt()
 {
 
+}
+
+void grabKey()
+{
+	int key_fd = open("key.txt", O_RDONLY);
+
+	if(key_fd < 0)
+	{
+		fprintf(stderr, "Error: unable to open key file for reading.\n%s\n", strerror(errno));
+		exit(1);
+	}
+
+	char keyBuf[17], highPart[9], lowPart[9];
+
+	memset(highPart, 0, strlen(highPart));
+	memset(lowPart, 0, strlen(lowPart));
+
+	int bytesRead = read(key_fd, keyBuf, 16);
+
+	if(bytesRead != 16)
+	{
+		fprintf(stderr, "Error: key file is of invalid size (must be 16 bytes)\n");
+		exit(1);
+	}
+
+	close(key_fd);
+
+	strncat(highPart, keyBuf, 8);
+	strncat(lowPart, &keyBuf[8], 8);
+
+	// keyBuf now has 16 bytes of hex text. Now we need to convert that to an integer in base 10.
+
+	key = (Key)strtoll(highPart, NULL, 16) << 32 | ((Key)strtoll(lowPart, NULL, 16) & 0xffffffff);
 }
