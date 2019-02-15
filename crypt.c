@@ -171,7 +171,34 @@ void encrypt()
 
 void decrypt()
 {
+	int ciphertext_file_fd = open("out.txt", O_RDONLY);
+	FILE *outstream = fopen("plaintextcopy.txt", "w+");
 
+	if(ciphertext_file_fd < 0)
+	{
+		fprintf(stderr, "Error: unable to open ciphertext file for reading.\n%s\n", strerror(errno));
+		exit(1);
+	}
+
+	if(outstream == NULL)
+	{
+		fprintf(stderr, "Error: unable to open outfile for writing. (Invalid permissions?)\n%s\n", strerror(errno));
+		exit(1);
+	}
+
+	char block[16];
+	ssize_t actualLen;
+
+	// while we can still read from the file
+	while((actualLen = read(ciphertext_file_fd, block, 16)) > 1)
+	{
+
+	}
+
+	// decryption here
+
+	close(ciphertext_file_fd);
+	fclose(outstream);
 }
 
 Word rotateWord(Word word, bool isRotatingLeft)
