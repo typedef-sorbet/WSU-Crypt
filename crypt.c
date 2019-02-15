@@ -10,6 +10,9 @@
 void encrypt();
 void decrypt();
 void grabKey();
+void rightRotateKey();
+void leftRotateKey();
+void printKey();
 
 void f();
 void g();
@@ -24,8 +27,6 @@ int main(int argc, char **argv)
 	// Plaintext file: plaintext.txt (regular text)
 	// Key file: key.txt (16 chars of HEX)
 	// Output file: out.txt (entirely HEX, indefinite size)
-
-	printf("Size of unsigned long long int: %ld\n", sizeof(unsigned long long int));
 
 	if(argc == 2)
 	{
@@ -82,6 +83,40 @@ void encrypt()
 void decrypt()
 {
 
+}
+
+unsigned char k()
+{
+	return 0;
+}
+
+void rightRotateKey()
+{
+	// circular rotation, so make sure to save the front bit
+
+	Key oldKey = key;
+	Key trimmings = oldKey & 0x1;
+	key = (trimmings << 63) | ((oldKey >> 1) & 0x7fffffffffffffff);
+}
+
+void leftRotateKey()
+{
+	// circular rotation, so make sure to save the end bit
+
+	Key oldKey = key;
+	Key trimmings = (oldKey >> 63) & 0x1;
+	key = ((oldKey << 1) & 0xfffffffffffffffe) | (trimmings & 0x1);
+}
+
+void printKey()
+{
+	// for debug use only!
+
+	for(int i = 63; i >= 0; i--)
+	{
+		printf("%d", ((key >> i) & 0x1) == 1 ? 1 : 0);
+	}
+	printf("\n");
 }
 
 void grabKey()
