@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <stdbool.h>
 
 void encrypt();
 void decrypt();
@@ -16,9 +17,11 @@ void printKey();
 
 void f();
 void g();
-unsigned char k();
+unsigned char k(int, bool);
 
 typedef unsigned long long int Key;
+typedef unsigned short Word;
+typedef unsigned char Byte;
 
 Key key;
 
@@ -85,9 +88,18 @@ void decrypt()
 
 }
 
-unsigned char k()
+unsigned char k(int x, bool isDecryption)
 {
-	return 0;
+	if(isDecryption)
+	{
+		Byte xthByte = nthKeyByte(x);
+		rightRotateKey();
+	}
+	else
+	{
+		leftRotateKey();
+		return nthKeyByte(x);
+	}
 }
 
 void rightRotateKey()
@@ -106,6 +118,12 @@ void leftRotateKey()
 	Key oldKey = key;
 	Key trimmings = (oldKey >> 63) & 0x1;
 	key = ((oldKey << 1) & 0xfffffffffffffffe) | (trimmings & 0x1);
+}
+
+Byte nthKeyByte(int n)
+{
+	n %= 8;
+	return (Byte)((key >> (8 * n)) & 0xff);
 }
 
 void printKey()
