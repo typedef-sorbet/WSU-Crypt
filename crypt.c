@@ -89,7 +89,7 @@ int main(int argc, char **argv)
 void encrypt()
 {
 	int plaintext_file_fd = open("plaintext.txt", O_RDONLY);
-	FILE *outstream = fopen("out.txt", "w+");
+	FILE *outstream = fopen("cyphertext.txt", "w+");
 
 	if(plaintext_file_fd < 0)
 	{
@@ -174,7 +174,7 @@ void encrypt()
 
 void decrypt()
 {
-	int ciphertext_file_fd = open("out.txt", O_RDONLY);
+	int ciphertext_file_fd = open("cyphertext.txt", O_RDONLY);
 	FILE *outstream = fopen("plaintextcopy.txt", "w+");
 
 	if(ciphertext_file_fd < 0)
