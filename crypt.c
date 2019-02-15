@@ -8,7 +8,11 @@
 #include <unistd.h>
 #include <stdbool.h>
 
+#define LEFT true
+#define RIGHT false
+
 typedef unsigned long long int Key;
+typedef unsigned long long int Cryptext;
 typedef unsigned short Word;
 typedef unsigned char Byte;
 
@@ -24,6 +28,9 @@ void rightRotateKey();
 void leftRotateKey();
 void printKey();
 Byte nthKeyByte(int);
+Word nthKeyWord(int);
+Word *wordify(char[]);
+Word rotateWord(Word, bool);
 
 FData f(Word, Word, int, bool);
 Word g(Word, int, Byte *);
@@ -79,6 +86,7 @@ int main(int argc, char **argv)
 void encrypt()
 {
 	int plaintext_file_fd = open("plaintext.txt", O_RDONLY);
+	FILE *outstream = fopen("out.txt", "w+");
 
 	if(plaintext_file_fd < 0)
 	{
@@ -86,7 +94,13 @@ void encrypt()
 		exit(1);
 	}
 
-	unsigned char block[8];
+	if(outstream == NULL)
+	{
+		fprintf(stderr, "Error: unable to open outfile for writing. (Invalid permissions?)\n%s\n", strerror(errno));
+		exit(1);
+	}
+
+	char block[8];
 	ssize_t actualLen;
 
 	// while we're able to grab stuff from the file...
@@ -101,14 +115,88 @@ void encrypt()
 			}
 		}
 
-		//TODO write this part after writing f,g, and k
+		// whitening stage
+		Word *words = wordify(block);
+		Word r[4];
+		Word new_r[4];
 
+		for(int i = 0; i < 4; i++)
+		{
+			r[i] = words[i] ^ nthKeyWord(3 - i);
+		}
+
+		//whitening done
+
+		// encrypt for 16 rounds
+		for(int round = 0; round < 16; round++)
+		{
+			FData data = f(r[0], r[1], round, false);
+			new_r[0] = rotateWord(r[2] ^ data.f0, RIGHT);
+			new_r[1] = rotateWord(r[3], LEFT) ^ data.f1;
+			new_r[2] = r[0];
+			new_r[3] = r[1];
+
+			for(int i = 0; i < 4; i++) 
+				r[i] = new_r[i];
+		}
+
+		Word y[4];
+
+		y[0] = r[2];
+		y[1] = r[3];
+		y[2] = r[0];
+		y[3] = r[1];
+
+		// whitening stage part 2: electric boogaloo
+		for(int i = 0; i < 4; i++)
+		{
+			y[i] ^= nthKeyWord(3 - i);
+		}
+
+		// output is concatenation of y[0:4]
+		// I know, that's python syntax, but this is a comment, so sue me.
+
+		Cryptext c = (Cryptext)((Cryptext)y[0] << (16*3) | (Cryptext)y[1] << (16*2) | (Cryptext)y[2] << 16 | (Cryptext)y[3]);
+
+		fprintf(outstream, "%llx", c);
+
+		//leave this at the end
+		memset(block, 0, 8);
 	}
+
+	close(plaintext_file_fd);
+	fclose(outstream);
 }
 
 void decrypt()
 {
 
+}
+
+Word rotateWord(Word word, bool isRotatingLeft)
+{
+	if(isRotatingLeft)
+	{
+		Word trimmings = (word >> 15) & 0x1;
+		return word << 1 | trimmings;
+	}
+	else
+	{
+		Word trimmings = (word & 0x1) << 15;
+		return word >> 1 | trimmings;
+	}
+}
+
+Word *wordify(char block[])
+{
+	Word wordArray[4];
+
+	for(int i = 0; i < 8; i += 2)
+	{
+		wordArray[i/2] = (Word)((Word)block[i] << 8 | (Word)block[i+1]);
+	}
+
+	return wordArray;
 }
 
 FData f(Word r0, Word r1, int round, bool isDecryption)
@@ -192,6 +280,12 @@ Byte nthKeyByte(int n)
 {
 	n %= 8;
 	return (Byte)((key >> (8 * n)) & 0xff);
+}
+
+Word nthKeyWord(int n)
+{
+	n %= 4;
+	return (Word)((key >> (16 * n)) & 0xffff);
 }
 
 void printKey()
