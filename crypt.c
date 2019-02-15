@@ -8,6 +8,8 @@
 #include <unistd.h>
 #include <stdbool.h>
 
+// TODO rename the ciphertext outfile to ciphertext.txt
+
 #define LEFT true
 #define RIGHT false
 
@@ -30,6 +32,7 @@ void printKey();
 Byte nthKeyByte(int);
 Word nthKeyWord(int);
 Word *wordify(char[]);
+Word *wordifyCipher(char[]);
 Word rotateWord(Word, bool);
 
 FData f(Word, Word, int, bool);
@@ -192,10 +195,64 @@ void decrypt()
 	// while we can still read from the file
 	while((actualLen = read(ciphertext_file_fd, block, 16)) > 1)
 	{
+		if(actualLen != 16)
+		{
+			// this should never happen
+			for(int i = actualLen; i < 16; i++)
+				block[i] = 0;
+		}
 
+		// whitening stage
+		Word *words = wordifyCipher(block);
+		Word r[4];
+		Word new_r[4];
+
+		for(int i = 0; i < 4; i++)
+		{
+			r[i] = words[i] ^ nthKeyWord(3 - i);
+		}
+
+		//whitening done
+
+		// encrypt for 16 rounds
+		// count backwards for decryption
+		for(int round = 15; round >= 0; round--)
+		{
+			FData data = f(r[0], r[1], round, true);
+			new_r[0] = rotateWord(r[2], LEFT) ^ data.f0;
+			new_r[1] = rotateWord(r[3] ^ data.f1, RIGHT);
+			new_r[2] = r[0];
+			new_r[3] = r[1];
+
+			for(int i = 0; i < 4; i++) 
+				r[i] = new_r[i];
+		}
+
+		Word y[4];
+
+		y[0] = r[2];
+		y[1] = r[3];
+		y[2] = r[0];
+		y[3] = r[1];
+
+		// whitening stage part 2: electric boogaloo
+		for(int i = 0; i < 4; i++)
+		{
+			y[i] ^= nthKeyWord(3 - i);
+		}
+
+		// y[0:4] contains 8 characters; two for each element
+
+		// output
+		for(int i = 0; i < 4; i++)
+		{
+			fprintf(outstream, "%c%c", (y[i] >> 8) & 0xff, y[i] & 0xff);
+		}
+
+		//leave this at the end
+		memset(block, 0, 16);
+		free(words);
 	}
-
-	// decryption here
 
 	close(ciphertext_file_fd);
 	fclose(outstream);
@@ -227,11 +284,26 @@ Word *wordify(char block[])
 	return wordArray;
 }
 
+Word *wordifyCipher(char block[])
+{
+	Word *wordArray = (Word *)malloc(4 * sizeof(Word));
+	char palette[5];
+
+	for(int i = 0; i < 16; i += 4)
+	{
+		memset(palette, 0, 5);
+		strncat(palette, &block[i], 4);
+		wordArray[i/4] = (Word)strtol(palette, NULL, 16);
+	}
+
+	return wordArray;
+}
+
 FData f(Word r0, Word r1, int round, bool isDecryption)
 {
 	Byte subkeys[12];
 
-	int additives[] = {0, 1, 2, 3};
+	int *additives = (!isDecryption)? (int[4]){0, 1, 2, 3} : (int[4]){3, 2, 1, 0};
 	for(int i = 0; i < 12; i++)
 	{
 		subkeys[i] = k(4*round + additives[i%4], isDecryption);
