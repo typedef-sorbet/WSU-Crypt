@@ -162,6 +162,7 @@ void encrypt()
 
 		//leave this at the end
 		memset(block, 0, 8);
+		free(words);
 	}
 
 	close(plaintext_file_fd);
@@ -189,7 +190,7 @@ Word rotateWord(Word word, bool isRotatingLeft)
 
 Word *wordify(char block[])
 {
-	Word wordArray[4];
+	Word *wordArray = (Word *)malloc(4 * sizeof(Word));
 
 	for(int i = 0; i < 8; i += 2)
 	{
