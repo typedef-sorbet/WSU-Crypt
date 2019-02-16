@@ -7,16 +7,18 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <inttypes.h>
 
 // TODO rename the ciphertext outfile to ciphertext.txt
 
 #define LEFT true
 #define RIGHT false
 
-typedef unsigned long long int Key;
-typedef unsigned long long int Cryptext;
-typedef unsigned short Word;
-typedef unsigned char Byte;
+typedef uint64_t Key;
+typedef uint64_t Cryptext;
+typedef uint16_t Word;
+typedef uint8_t Byte;
 
 typedef struct fdata{
 	Word f0;
@@ -161,7 +163,7 @@ void encrypt()
 
 		Cryptext c = (Cryptext)((Cryptext)y[0] << (16*3) | (Cryptext)y[1] << (16*2) | (Cryptext)y[2] << 16 | (Cryptext)y[3]);
 
-		fprintf(outstream, "%llx", c);
+		fprintf(outstream, "%llx", (unsigned long long int)c);
 
 		//leave this at the end
 		memset(block, 0, 8);
@@ -201,6 +203,9 @@ void decrypt()
 			for(int i = actualLen; i < 16; i++)
 				block[i] = 0;
 		}
+
+		if(key != 12379813738877118345)
+			printf("Invalid key at start of encryption block!!\n");
 
 		// whitening stage
 		Word *words = wordifyCipher(block);
@@ -347,7 +352,7 @@ unsigned char k(int x, bool isDecryption)
 {
 	if(isDecryption)
 	{
-		Byte xthByte = nthKeyByte(7- x);
+		Byte xthByte = nthKeyByte(7 - x);
 		rightRotateKey();
 		return xthByte;
 	}
