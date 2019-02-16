@@ -39,7 +39,7 @@ Word rotateWord(Word, bool);
 
 FData f(Word, Word, int, bool);
 Word g(Word, int, Byte *);
-unsigned char k(int, bool);
+Byte k(int, bool);
 
 Key key;
 
@@ -159,11 +159,9 @@ void encrypt()
 		}
 
 		// output is concatenation of y[0:4]
-		// I know, that's python syntax, but this is a comment, so sue me.
+		// I know, that's python syntax, but this is a comment, so sue me lmao.
 
-		Cryptext c = (Cryptext)((Cryptext)y[0] << (16*3) | (Cryptext)y[1] << (16*2) | (Cryptext)y[2] << 16 | (Cryptext)y[3]);
-
-		fprintf(outstream, "%llx", (unsigned long long int)c);
+		fprintf(outstream, "%04hx%04hx%04hx%04hx", y[0], y[1], y[2], y[3]);
 
 		//leave this at the end
 		memset(block, 0, 8);
@@ -204,9 +202,6 @@ void decrypt()
 				block[i] = 0;
 		}
 
-		if(key != 12379813738877118345)
-			printf("Invalid key at start of encryption block!!\n");
-
 		// whitening stage
 		Word *words = wordifyCipher(block);
 		Word r[4];
@@ -214,7 +209,7 @@ void decrypt()
 
 		for(int i = 0; i < 4; i++)
 		{
-			r[i] = words[i] ^ nthKeyWord(3 - i);
+			r[i] = words[i] ^ nthKeyWord(3-i);
 		}
 
 		//whitening done
@@ -243,7 +238,7 @@ void decrypt()
 		// whitening stage part 2: electric boogaloo
 		for(int i = 0; i < 4; i++)
 		{
-			y[i] ^= nthKeyWord(3 - i);
+			y[i] ^= nthKeyWord(3-i);
 		}
 
 		// y[0:4] contains 8 characters; two for each element
@@ -251,7 +246,7 @@ void decrypt()
 		// output
 		for(int i = 0; i < 4; i++)
 		{
-			fprintf(outstream, "%c%c", (y[i] >> 8) & 0xff, y[i] & 0xff);
+			fprintf(outstream, "%c%c", (y[i] >> 8) & 0xff, y[i] & 0x00ff);
 		}
 
 		//leave this at the end
@@ -348,8 +343,10 @@ Word g(Word w, int round, Byte *keysToUse)
 	return (Word)((Word)g5 << 8 | (Word)g6);
 }
 
-unsigned char k(int x, bool isDecryption)
+Byte k(int x, bool isDecryption)
 {
+	x %= 8;
+
 	if(isDecryption)
 	{
 		Byte xthByte = nthKeyByte(7 - x);
