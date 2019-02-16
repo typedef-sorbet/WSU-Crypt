@@ -347,14 +347,14 @@ unsigned char k(int x, bool isDecryption)
 {
 	if(isDecryption)
 	{
-		Byte xthByte = nthKeyByte(x);
+		Byte xthByte = nthKeyByte(7- x);
 		rightRotateKey();
 		return xthByte;
 	}
 	else
 	{
 		leftRotateKey();
-		return nthKeyByte(x);
+		return nthKeyByte(7 - x);
 	}
 }
 
