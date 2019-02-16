@@ -7,14 +7,18 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <inttypes.h>
+
+// TODO rename the ciphertext outfile to ciphertext.txt
 
 #define LEFT true
 #define RIGHT false
 
-typedef unsigned long long int Key;
-typedef unsigned long long int Cryptext;
-typedef unsigned short Word;
-typedef unsigned char Byte;
+typedef uint64_t Key;
+typedef uint64_t Cryptext;
+typedef uint16_t Word;
+typedef uint8_t Byte;
 
 typedef struct fdata{
 	Word f0;
@@ -30,11 +34,12 @@ void printKey();
 Byte nthKeyByte(int);
 Word nthKeyWord(int);
 Word *wordify(char[]);
+Word *wordifyCipher(char[]);
 Word rotateWord(Word, bool);
 
 FData f(Word, Word, int, bool);
 Word g(Word, int, Byte *);
-unsigned char k(int, bool);
+Byte k(int, bool);
 
 Key key;
 
@@ -86,7 +91,7 @@ int main(int argc, char **argv)
 void encrypt()
 {
 	int plaintext_file_fd = open("plaintext.txt", O_RDONLY);
-	FILE *outstream = fopen("out.txt", "w+");
+	FILE *outstream = fopen("cyphertext.txt", "w+");
 
 	if(plaintext_file_fd < 0)
 	{
@@ -154,11 +159,9 @@ void encrypt()
 		}
 
 		// output is concatenation of y[0:4]
-		// I know, that's python syntax, but this is a comment, so sue me.
+		// I know, that's python syntax, but this is a comment, so sue me lmao.
 
-		Cryptext c = (Cryptext)((Cryptext)y[0] << (16*3) | (Cryptext)y[1] << (16*2) | (Cryptext)y[2] << 16 | (Cryptext)y[3]);
-
-		fprintf(outstream, "%llx", c);
+		fprintf(outstream, "%04hx%04hx%04hx%04hx", y[0], y[1], y[2], y[3]);
 
 		//leave this at the end
 		memset(block, 0, 8);
@@ -171,7 +174,88 @@ void encrypt()
 
 void decrypt()
 {
+	int ciphertext_file_fd = open("cyphertext.txt", O_RDONLY);
+	FILE *outstream = fopen("plaintextcopy.txt", "w+");
 
+	if(ciphertext_file_fd < 0)
+	{
+		fprintf(stderr, "Error: unable to open ciphertext file for reading.\n%s\n", strerror(errno));
+		exit(1);
+	}
+
+	if(outstream == NULL)
+	{
+		fprintf(stderr, "Error: unable to open outfile for writing. (Invalid permissions?)\n%s\n", strerror(errno));
+		exit(1);
+	}
+
+	char block[16];
+	ssize_t actualLen;
+
+	// while we can still read from the file
+	while((actualLen = read(ciphertext_file_fd, block, 16)) > 1)
+	{
+		if(actualLen != 16)
+		{
+			// this should never happen
+			for(int i = actualLen; i < 16; i++)
+				block[i] = 0;
+		}
+
+		// whitening stage
+		Word *words = wordifyCipher(block);
+		Word r[4];
+		Word new_r[4];
+
+		for(int i = 0; i < 4; i++)
+		{
+			r[i] = words[i] ^ nthKeyWord(3-i);
+		}
+
+		//whitening done
+
+		// encrypt for 16 rounds
+		// count backwards for decryption
+		for(int round = 15; round >= 0; round--)
+		{
+			FData data = f(r[0], r[1], round, true);
+			new_r[0] = rotateWord(r[2], LEFT) ^ data.f0;
+			new_r[1] = rotateWord(r[3] ^ data.f1, RIGHT);
+			new_r[2] = r[0];
+			new_r[3] = r[1];
+
+			for(int i = 0; i < 4; i++) 
+				r[i] = new_r[i];
+		}
+
+		Word y[4];
+
+		y[0] = r[2];
+		y[1] = r[3];
+		y[2] = r[0];
+		y[3] = r[1];
+
+		// whitening stage part 2: electric boogaloo
+		for(int i = 0; i < 4; i++)
+		{
+			y[i] ^= nthKeyWord(3-i);
+		}
+
+		// y[0:4] contains 8 characters; two for each element
+
+		// output
+		for(int i = 0; i < 4; i++)
+		{
+			fprintf(outstream, "%c%c", (y[i] >> 8) & 0xff, y[i] & 0x00ff);
+		}
+
+		//leave this at the end
+		memset(block, 0, 16);
+		free(words);
+	}
+
+	close(ciphertext_file_fd);
+	fclose(outstream);
 }
 
 Word rotateWord(Word word, bool isRotatingLeft)
@@ -200,11 +284,26 @@ Word *wordify(char block[])
 	return wordArray;
 }
 
+Word *wordifyCipher(char block[])
+{
+	Word *wordArray = (Word *)malloc(4 * sizeof(Word));
+	char palette[5];
+
+	for(int i = 0; i < 16; i += 4)
+	{
+		memset(palette, 0, 5);
+		strncat(palette, &block[i], 4);
+		wordArray[i/4] = (Word)strtol(palette, NULL, 16);
+	}
+
+	return wordArray;
+}
+
 FData f(Word r0, Word r1, int round, bool isDecryption)
 {
 	Byte subkeys[12];
 
-	int additives[] = {0, 1, 2, 3};
+	int *additives = (!isDecryption)? (int[4]){0, 1, 2, 3} : (int[4]){3, 2, 1, 0};
 	for(int i = 0; i < 12; i++)
 	{
 		subkeys[i] = k(4*round + additives[i%4], isDecryption);
@@ -244,18 +343,20 @@ Word g(Word w, int round, Byte *keysToUse)
 	return (Word)((Word)g5 << 8 | (Word)g6);
 }
 
-unsigned char k(int x, bool isDecryption)
+Byte k(int x, bool isDecryption)
 {
+	x %= 8;
+
 	if(isDecryption)
 	{
-		Byte xthByte = nthKeyByte(x);
+		Byte xthByte = nthKeyByte(7 - x);
 		rightRotateKey();
 		return xthByte;
 	}
 	else
 	{
 		leftRotateKey();
-		return nthKeyByte(x);
+		return nthKeyByte(7 - x);
 	}
 }
 
